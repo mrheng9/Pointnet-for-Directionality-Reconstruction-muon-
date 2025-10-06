@@ -1,5 +1,5 @@
 # PointNet++ for directionality reconstruction — Tutorial
-
+This tutorial based on the server @10.102.33.217  （GPU04）
 ## Overview
 The Jiangmen Underground Neutrino Observatory **(JUNO)** is a large liquid-scintillator detector designed to determine the neutrino mass ordering and precisely measure oscillation parameters.   
 ![](https://github.com/user-attachments/assets/e33b6881-fad5-4585-a326-d289810b430b)
@@ -13,7 +13,7 @@ Beyond reactor neutrinos, JUNO also observes atmospheric neutrinos whose charged
   - `PMTLoader.py` — `CustomDataset`, and data stacking helpers
 - `README.md` — brief usage notes
 
-## Environment (conda, Windows)
+## Environment 
 
 Dependencies:
 - python=3.8
@@ -25,7 +25,7 @@ Dependencies:
 - pandas
 - git
 
-Setup (PowerShell):
+Setup :
 ```powershell
 # Create and activate env
 conda create -n pointnet2p python=3.8 -y
@@ -35,7 +35,7 @@ conda activate pointnet2p
 conda install numpy scikit-learn matplotlib tqdm pandas git -y
 conda install pytorch -c pytorch -y
 ```
-## Data Preparation
+## Data and Features
 Implement or point the loader to your dataset through `data_utils/PMTLoader.py`.
 
 Expected conventions:
@@ -82,8 +82,19 @@ Check running display information in nohup.out
 
 `nohup` is a great way to keep your logs tidy. It ensures that the output from each training process gets its own file, which is perfect for when you're running different jobs on different GPUs at the same time and want to keep things separate.  
 Learn how to manage GPU ([GPU Management](https://github.com/mrheng9/mrheng9/blob/main/tutorial/tutorial.md#gpu-management))
-
+### Plots (auto-saved by train.py)
 - learning_curve.png — Train/Test loss vs. epoch (log y-axis).
 - Test Performance.png — Scatter of predicted vs. true θ with y=x reference.
 - error_distribution.png — Histogram of (pred − true) angle errors in degrees, with mean/std annotations.
 - angel_distribution.png — Opening angle α PDF between true and predicted directions, with 68% quantile marker.
+
+## Reference Results
+1 GeV muon direction reconstruction — α angle resolution (68th percentile).  
+Different models vs. different data sources (best resolution per setting).  
+Features used: ["fht", "slope", "peak", "timemax", "nperatio5", "npe"]
+
+![1 GeV Muon α(°) 68th percentile — model/data comparison](https://github.com/user-attachments/assets/8f339837-5deb-46a4-af47-a96ad0c726ae)
+
+Notes:
+- α: opening angle between predicted and true directions (degrees).
+- Use this plot to check if your run matches or improves the 68% quantile for your chosen data_source (det/elec/cnn/rawnet) and feature set.
