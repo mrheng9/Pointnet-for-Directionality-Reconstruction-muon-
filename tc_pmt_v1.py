@@ -8,6 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchinfo import summary
 from data_utils.PMTLoader import PMTDataLoader,CustomDataset,get_stacked_datanorm,get_stacked_datawei,get_stacked_datachy,get_stacked_dataweiCNN
+from data_utils.PMTLoader import jitter_point_cloud, random_point_dropout
 # from models.pointnet_regression import get_model,get_loss
 from models.pointnet_regression_ssg import get_model,get_loss
 from tqdm import tqdm
@@ -16,7 +17,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-import provider  
 
 def parse_args():
     parser = argparse.ArgumentParser('training')
@@ -54,40 +54,29 @@ def augment_point_cloud(batch_data, jitter=True, dropout=True):
     else:
         is_tensor = False
         
-    # 仅对坐标部分进行增强（前3个通道）
     coords = batch_data[:, :, 0:3].copy()
     features = batch_data[:, :, 3:].copy() if batch_data.shape[2] >= 3 else None
     
-    # 1. 添加抖动模拟测量误差（仅应用于坐标）
+    # 1. simulate jitter (only coordinates are affected)
     if jitter:
-        coords = provider.jitter_point_cloud(coords, sigma=0.005, clip=0.02)
-    
-    # 组合坐标和特征
+        coords = jitter_point_cloud(coords, sigma=0.005, clip=0.02)
+
     if features is not None:
         augmented_data = np.concatenate([coords, features], axis=2)
     else:
         augmented_data = coords
         
-    # 2. 模拟点丢失（坐标和特征都受影响）
+    # 2. simulate dropout (only coordinates are affected)
     if dropout:
-        augmented_data = provider.random_point_dropout(augmented_data, max_dropout_ratio=0.3)
+        augmented_data = random_point_dropout(augmented_data, max_dropout_ratio=0.3)
     
-    # 将numpy数组转回tensor（如果输入是tensor）
     if is_tensor:
         augmented_data = torch.from_numpy(augmented_data).to(device)
         
     return augmented_data
 
 def load_data():
-    # Implement your data loading logic here
-    # For example, if your data is stored in a numpy file:
-    # coord_data = np.load('/disk_pool1/houyh/data/whichPixel_nside32_LCDpmts.npy')
-    # coordx = coord_data[:, 2]
-    # coordy = coord_data[:, 3]
-    # coordz = coord_data[:, 4]
-    # coord_all = np.stack((coordx,coordy,coordz), axis=-1)
     coord_all = np.load('/disk_pool1/houyh/coords/norm_coords')
-    #coord_all = coord_all [:9850,:,:]
 
     #feature_list = ["pmt_fht", "pmt_slope","pmt_nperatio5",'pmt_peaktime',"pmt_timemax", "pmt_npe"]
     feature_list = ["fht","slope","peak","timemax","nperatio5"]
@@ -110,14 +99,10 @@ def load_data():
     epsilon = 1e-8
     x_all[:,:,1] = x_all[:,:,1]/(x_all[:,:,-1]+ epsilon)
     
-    # 初始化 StandardScaler
-    scaler = StandardScaler()
-    # 遍历最后一个维度的每一个 feature (共有 6 个)
-    for i in range(x_all.shape[-1]):
-        # 使用当前 feature 的所有样本进行拟合
-        scaler.fit(x_all[:, :, i])
-        # 对训练集和测试集（如果存在）的对应 feature 进行转换
-        x_all[:, :, i] = scaler.transform(x_all[:, :, i])
+    # scaler = StandardScaler()
+    # for i in range(x_all.shape[-1]):
+    #     scaler.fit(x_all[:, :, i])
+    #     x_all[:, :, i] = scaler.transform(x_all[:, :, i])
 
     # B,_,_=x_all.shape
     # coord_all_expanded = np.expand_dims(coord_all, axis=0)
@@ -139,16 +124,19 @@ def load_data():
 
     print("shape of y_all:",y_all.shape) 
 
-    labels = y_all  # Adjust this according to your data format
-    points = x_all  # Adjust this according to your data format
+    labels = y_all  
+    points = x_all  
 
-    # 划分训练集和测试集
     points_train, points_test, labels_train, labels_test = train_test_split(points, labels, test_size=0.2, random_state=42)
-    #将前2000个样本作为测试集，其余作为训练集
-    # points_test = points[:2000]
-    # points_train = points[2000:]
-    # labels_test = labels[:2000] 
-    # labels_train = labels[2000:]
+    
+    # 仅对“特征部分”做标准化：假设坐标在前3列，之后是可标准化的通道
+    feat_start = 3
+    for i in range(feat_start, points_train.shape[-1]):
+        scaler = StandardScaler()
+        scaler.fit(points_train[:, :, i])             
+        points_train[:, :, i] = scaler.transform(points_train[:, :, i])
+        points_test[:,  :, i] = scaler.transform(points_test[:,  :, i])
+
 
     #Normalization
     vector_norms = np.sqrt(np.sum(labels_train**2, axis=1))
@@ -160,7 +148,7 @@ def load_data():
 
 
 def draw_learning_curve(train_losses, test_losses):
-    plt.figure(figsize=(12, 8))  # 增加图像整体大小
+    plt.figure(figsize=(12, 8))  
     plt.plot(range(1, args.epoch + 1), train_losses, label='Train Loss', linewidth=2)
     plt.plot(range(1, args.epoch + 1), test_losses, label='Test Loss', linewidth=2)
     plt.xlabel('Epoch', fontsize=25)
@@ -188,18 +176,10 @@ def draw_performance(x, y):
     plt.close()
 def draw_error_distribution(true_vals, pred_vals):
     plt.figure(figsize=(12, 8))
-    
-    # 计算预测误差 (转换为角度)
     differences = (pred_vals - true_vals) * 180 / np.pi 
-
-    # 绘制误差分布直方图
     plt.hist(differences, bins=50, alpha=0.7, density=True,
              label='Prediction Errors', color='blue')
-    
-    # 添加零误差线
     plt.axvline(x=0, color='r', linestyle='--', label='Zero Error')
-    
-    # 添加统计信息
     mean_diff = np.mean(differences)
     std_diff = np.std(differences)
     plt.axvline(x=mean_diff, color='g', linestyle='--',
@@ -364,13 +344,13 @@ def main(args):
         verbose=True,
         min_lr=1e-6
     )
-    # Replace the existing scheduler with this one
-
+    # Replace the existing scheduler with one of the following:
+    #1. ExponentialLR
     # scheduler = optim.lr_scheduler.ExponentialLR(
     #     optimizer,
     #     gamma=0.95,  # This is equivalent to multiplying by 0.98 each epoch
     # )
-
+    #2. CosineAnnealingLR
     # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoch, eta_min=1e-6)
 
     train_dataset = CustomDataset(points_train, labels_train)

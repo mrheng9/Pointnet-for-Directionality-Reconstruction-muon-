@@ -33,11 +33,11 @@ class get_model(nn.Module):
         #第一层加msg1024(加深)
         # self.sa1 = PointNetSetAbstractionMsg(npoint=1024,radius_list=[0.05, 0.1, 0.2, 0.4],nsample_list=[16, 32, 64, 128],in_channel=in_channel,mlp_list=[[32, 64, 96, 128],[64, 96, 128, 192],[64, 96, 128, 192],[64, 96, 128, 256]])
 
-        # self.sa2 = PointNetSetAbstractionMsg(       # 将 SA2 也改为 MSG
+        # self.sa2 = PointNetSetAbstractionMsg(      
         #     npoint=256,
         #     radius_list=[0.2, 0.4, 0.6],
         #     nsample_list=[32, 64, 128],
-        #     in_channel=(128+192+192+256)+3,         # 对应 SA1 的四个分支输出通道之和
+        #     in_channel=(128+192+192+256)+3,         
         #     mlp_list=[
         #         [64, 96, 128, 192],
         #         [96, 128, 192, 256],
@@ -46,7 +46,7 @@ class get_model(nn.Module):
         # )
 
         # self.sa3 = PointNetSetAbstraction(
-        #     npoint=64,                              # 增加一个中间层
+        #     npoint=64,                              
         #     radius=0.8,
         #     nsample=128,
         #     in_channel=(192+256+256)+3,
@@ -54,7 +54,7 @@ class get_model(nn.Module):
         #     group_all=False
         # )
 
-        # self.sa4 = PointNetSetAbstraction(          # 全局特征聚合
+        # self.sa4 = PointNetSetAbstraction(          
         #     npoint=None,
         #     radius=None,
         #     nsample=None,
@@ -150,6 +150,7 @@ class get_model(nn.Module):
         # x = self.drop2(F.relu(self.bn2(self.fc2(x))))
         # x = self.drop3(F.relu(self.bn3(self.fc3(x))))
         # x = self.fc4(x)
+        
         #加深
         # x = l3_points.view(B, 2048)
         # x = self.drop1(F.relu(self.bn1(self.fc1(x))))

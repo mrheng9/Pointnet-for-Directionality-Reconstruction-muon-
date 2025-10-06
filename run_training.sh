@@ -1,1 +1,0 @@
-nohup python tc_pmt_v1.py >output47.log 2>&1 &

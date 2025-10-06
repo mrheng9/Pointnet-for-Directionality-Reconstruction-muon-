@@ -49,9 +49,8 @@ def index_points(points, idx):
     """
     device = points.device
     B = points.shape[0]
-    N = points.shape[1]  # 获取点云的总数量
-    
-    # 安全检查：确保所有索引都在有效范围内（0 到 N-1）
+    N = points.shape[1]  
+
     idx = torch.clamp(idx, 0, N-1)
     
     view_shape = list(idx.shape)
@@ -82,8 +81,8 @@ def farthest_point_sample(xyz, npoint):
         dist = torch.sum((xyz - centroid) ** 2, -1)
         mask = dist < distance
 
-        distance = distance.float()  # 确保 distance 是 Float 类型
-        dist = dist.float()          # 确保 dist 是 Float 类型
+        distance = distance.float()  
+        dist = dist.float()          
 
         distance[mask] = dist[mask]
         farthest = torch.max(distance, -1)[1]
@@ -103,19 +102,12 @@ def query_ball_point(radius, nsample, xyz, new_xyz):
     B, N, C = xyz.shape
     _, S, _ = new_xyz.shape
 
-    # 初始化索引和计算距离
     group_idx = torch.arange(N, dtype=torch.long).to(device).view(1, 1, N).repeat([B, S, 1])
     sqrdists = square_distance(new_xyz, xyz) 
-    # 标记超出半径的点
+
     group_idx[sqrdists > radius ** 2] = N
-    # print("group_idx: ", group_idx.shape)
-    # 排序并截取前nsample个点
     group_idx = group_idx.sort(dim=-1)[0][:, :, :nsample]
-    # 创建有效的替代索引
-    # 注意：需要确保这里的维度和group_idx一致
     group_first = group_idx[:, :, 0].view(B, S, 1).repeat([1, 1, nsample])
-    # print("group_first: ", group_first.shape)
-    # 替换无效点
     mask = group_idx == N
     group_idx[mask] = group_first[mask]
     
