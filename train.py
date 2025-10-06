@@ -27,11 +27,7 @@ def parse_args():
     parser.add_argument('--epoch', default=80, type=int, help='number of epoch in training')
     parser.add_argument('--learning_rate', default=0.0005, type=float, help='learning rate in training')
     parser.add_argument('--weight_decay', default=1e-4, type=float, help='weight decay in training')
-
-    parser.add_argument('--num_point', type=int, default=1024, help='Point Number')
-    parser.add_argument('--use_uniform_sample', default=True, help='Use uniform sampling')
-    parser.add_argument('--use_normals',default=True, help='Use normals')
-    parser.add_argument('--normalize_points', default=True, help='Use normalized points')  
+    parser.add_argument('--data_source',type=str,default='cnn',help='choose from: det|elec|cnn|rawnet')
 
     parser.add_argument('--log_dir', type=str, default='/disk_pool1/houyh/experiments/test47', help='experiment root')
     return parser.parse_args()
@@ -75,77 +71,145 @@ def augment_point_cloud(batch_data, jitter=True, dropout=True):
         
     return augmented_data
 
-def load_data():
-    coord_all = np.load('/disk_pool1/houyh/coords/norm_coords')
+# def load_data(args):
+#     coord_all = np.load('/disk_pool1/houyh/coords/norm_coords')
 
-    #feature_list = ["pmt_fht", "pmt_slope","pmt_nperatio5",'pmt_peaktime',"pmt_timemax", "pmt_npe"]
-    feature_list = ["fht","slope","peak","timemax","nperatio5"]
-    all_features = []
-    folder_path = '/disk_pool1/houyh/data/y' #6,7,8 y 9,10,11
-    # folder_path = '/disk_pool1/chenzhx/random_muon/detsim/y' #2,3,4 y_all 5,6,7
-    # folder_path0 = '/disk_pool1/chenzhx/rebuilt_data/CNN'
-    # folder_path1 = '/disk_pool1/chenzhx/rebuilt_data/rawnet'
-    folder_path1 = '/disk_pool1/chenzhx/rebuilt_data/rawnet/pmt_together4'
-    folder_path2 = '/disk_pool1/houyh/data/det_pmt'
-    folder_path3 = '/disk_pool1/houyh/data/reco_pmt'
-    folder_path4 = '/disk_pool1/houyh/data/elec_pmt'
-    # for feature in feature_list:
-    #    all_features.append(get_stacked_dataweiCNN(folder_path3,feature))
-    # all_features.append(get_stacked_dataweiCNN(folder_path4,"npe"))
-    # x_all = np.stack(all_features ,axis=-1)
+#     #feature_list = ["pmt_fht", "pmt_slope","pmt_nperatio5",'pmt_peaktime',"pmt_timemax", "pmt_npe"]
+#     feature_list = ["fht","slope","peak","timemax","nperatio5"]
+#     all_features = []
+#     folder_path = '/disk_pool1/houyh/data/y'
+#     folder_path1 = '/disk_pool1/chenzhx/rebuilt_data/rawnet/pmt_together4'
+#     folder_path2 = '/disk_pool1/houyh/data/det_pmt'
+#     folder_path3 = '/disk_pool1/houyh/data/reco_pmt'
+#     folder_path4 = '/disk_pool1/houyh/data/elec_pmt'
+#     for feature in feature_list:
+#        all_features.append(get_stacked_dataweiCNN(folder_path3,feature))
+#     all_features.append(get_stacked_dataweiCNN(folder_path4,"npe"))
+#     x_all = np.stack(all_features ,axis=-1)
 
-    x_all=get_stacked_datanorm(folder_path1)
+#     #x_all=get_stacked_datanorm(folder_path1)
 
-    epsilon = 1e-8
-    x_all[:,:,1] = x_all[:,:,1]/(x_all[:,:,-1]+ epsilon)
+#     epsilon = 1e-8
+#     x_all[:,:,1] = x_all[:,:,1]/(x_all[:,:,-1]+ epsilon)
     
-    # scaler = StandardScaler()
-    # for i in range(x_all.shape[-1]):
-    #     scaler.fit(x_all[:, :, i])
-    #     x_all[:, :, i] = scaler.transform(x_all[:, :, i])
+#     # scaler = StandardScaler()
+#     # for i in range(x_all.shape[-1]):
+#     #     scaler.fit(x_all[:, :, i])
+#     #     x_all[:, :, i] = scaler.transform(x_all[:, :, i])
 
-    # B,_,_=x_all.shape
-    # coord_all_expanded = np.expand_dims(coord_all, axis=0)
-    # coord_all = np.tile(coord_all_expanded, (B, 1, 1))  # 现在 coord_all 的形状是 (B, 1, 3)
-    x_all = np.concatenate([coord_all,x_all],axis=-1)
-    print("shape of x_all:",x_all.shape) 
+
+#     x_all = np.concatenate([coord_all,x_all],axis=-1)
+#     print("shape of x_all:",x_all.shape) 
    
    
-    #入射方向
-    y_all = get_stacked_datachy(folder_path,"y")
-    # coordx_in = y_all[:,6]
-    # coordy_in = y_all[:,7]
-    # coordz_in = y_all[:,8]
+#     # Incident angle
+#     y_all = get_stacked_datachy(folder_path,"y")
+#     coordx_in = np.sin(y_all[:,0])*np.cos(y_all[:,1])
+#     coordy_in = np.sin(y_all[:,0])*np.sin(y_all[:,1])
+#     coordz_in = np.cos(y_all[:,0])
+#     y_all = np.stack((coordx_in,coordy_in,coordz_in), axis=-1)
+#     print("shape of y_all:",y_all.shape) 
+
+#     labels = y_all  
+#     points = x_all  
+
+#     points_train, points_test, labels_train, labels_test = train_test_split(points, labels, test_size=0.2, random_state=42)
+
+#     # 仅对“特征部分”做标准化：假设坐标在前3列，之后是可标准化的通道
+#     feat_start = 3
+#     for i in range(feat_start, points_train.shape[-1]):
+#         scaler = StandardScaler()
+#         scaler.fit(points_train[:, :, i])             
+#         points_train[:, :, i] = scaler.transform(points_train[:, :, i])
+#         points_test[:,  :, i] = scaler.transform(points_test[:,  :, i])
+
+
+#     #Normalization
+#     vector_norms = np.sqrt(np.sum(labels_train**2, axis=1))
+#     max_norm = np.max(vector_norms)
+#     labels_train = labels_train / max_norm
+#     labels_test = labels_test / max_norm
+
+#     return points_train, points_test, labels_train, labels_test
+
+def load_data(args):
+    coord_all = np.load('/disk_pool1/houyh/coords/norm_coords')
+    print("shape of coord_all:", coord_all.shape)
+    folder_path_y = '/disk_pool1/houyh/data/y'
+    folder_path1 = '/disk_pool1/chenzhx/rebuilt_data/rawnet/pmt_together4'  # rawnet
+    folder_path2 = '/disk_pool1/houyh/data/det_pmt'                         # det
+    folder_path3 = '/disk_pool1/houyh/data/reco_pmt'                        # reco_pmt
+    folder_path4 = '/disk_pool1/houyh/data/elec_pmt'                        # elec_pmt
+
+    src = args.data_source.lower()
+    all_features = []
+
+    if src == 'det':
+        # 1) detector simulation: 
+        feature_list = ["pmt_fht", "pmt_slope","pmt_nperatio5","pmt_peaktime","pmt_timemax","pmt_npe"]
+        all_features = [get_stacked_datawei(folder_path2, f) for f in feature_list]
+        x_all = np.stack(all_features, axis=-1)
+
+    elif src == 'elec':
+        # 2) electronics simulation: 
+        feature_list = ["fht","slope","peak","timemax","nperatio5", "npe"]
+        all_features = [get_stacked_dataweiCNN(folder_path4, f) for f in feature_list]
+        x_all = np.stack(all_features, axis=-1)
+        coord_all = coord_all[:9850] 
+
+    elif src == 'cnn':
+        # 3) CNN : 
+        feature_list = ["fht","slope","peak","timemax","nperatio5"]
+        all_features = [get_stacked_dataweiCNN(folder_path3, f) for f in feature_list]
+        all_features.append(get_stacked_dataweiCNN(folder_path4, "npe"))
+        x_all = np.stack(all_features, axis=-1)
+        coord_all = coord_all[:9850]   
+
+    elif src == 'rawnet':
+        # 4) Rawnet ：
+        x_all = get_stacked_datanorm(folder_path1)
+
+    else:
+        raise ValueError(f'Unknown data_source: {args.data_source}')
+
+    if src in ('det', 'reco', 'elec') and x_all.shape[-1] >= 2:
+        epsilon = 1e-8
+        x_all[:, :, 1] = x_all[:, :, 1] / (x_all[:, :, -1] + epsilon)
+
+    x_all = np.concatenate([coord_all, x_all], axis=-1)
+    print("shape of x_all:", x_all.shape)
+
+    # Incident angle
+
+
+    y_all = get_stacked_datachy(folder_path_y, "y")
+    if args.data_source.lower() in ('cnn', 'elec'):
+        y_all = y_all[:9850]
     coordx_in = np.sin(y_all[:,0])*np.cos(y_all[:,1])
     coordy_in = np.sin(y_all[:,0])*np.sin(y_all[:,1])
     coordz_in = np.cos(y_all[:,0])
     y_all = np.stack((coordx_in,coordy_in,coordz_in), axis=-1)
-    
+    print("shape of y_all:", y_all.shape)
 
-    print("shape of y_all:",y_all.shape) 
+    labels = y_all
+    points = x_all
 
-    labels = y_all  
-    points = x_all  
 
     points_train, points_test, labels_train, labels_test = train_test_split(points, labels, test_size=0.2, random_state=42)
-    
-    # 仅对“特征部分”做标准化：假设坐标在前3列，之后是可标准化的通道
     feat_start = 3
     for i in range(feat_start, points_train.shape[-1]):
         scaler = StandardScaler()
-        scaler.fit(points_train[:, :, i])             
+        scaler.fit(points_train[:, :, i])
         points_train[:, :, i] = scaler.transform(points_train[:, :, i])
         points_test[:,  :, i] = scaler.transform(points_test[:,  :, i])
 
-
-    #Normalization
+    # normalization
     vector_norms = np.sqrt(np.sum(labels_train**2, axis=1))
     max_norm = np.max(vector_norms)
     labels_train = labels_train / max_norm
     labels_test = labels_test / max_norm
 
     return points_train, points_test, labels_train, labels_test
-
 
 def draw_learning_curve(train_losses, test_losses):
     plt.figure(figsize=(12, 8))  
@@ -322,7 +386,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and not args.use_cpu else "cpu")
 
     # Load data
-    points_train, points_test, labels_train, labels_test = load_data()
+    points_train, points_test, labels_train, labels_test = load_data(args)
 
     # Modified model initialization
     model = get_model(3, normal_channel=True)
