@@ -10,7 +10,6 @@ from torchinfo import summary
 from data_utils.PMTLoader import PMTDataLoader,CustomDataset,get_stacked_datanorm,get_stacked_datawei,get_stacked_datachy,get_stacked_dataweiCNN
 # from models.pointnet_regression import get_model,get_loss
 from models.pointnet_regression_ssg import get_model,get_loss
-import provider 
 from tqdm import tqdm
 import logging
 from sklearn.model_selection import train_test_split
@@ -48,7 +47,6 @@ def setup_logging():
     return logger
 
 def augment_point_cloud(batch_data, jitter=True, dropout=True):
-    # 将tensor转换为numpy进行处理
     if isinstance(batch_data, torch.Tensor):
         is_tensor = True
         device = batch_data.device
@@ -152,26 +150,9 @@ def load_data():
     # labels_test = labels[:2000] 
     # labels_train = labels[2000:]
 
-    # 标准化
-    # mean = np.mean(labels_train, axis=0)
-    # std = np.std(labels_train, axis=0)
-    # labels_train = (labels_train - mean) / std
-    # labels_test = (labels_test - mean) / std
-    # min_max 归一化
-    # min_val = np.min(labels_train, axis=0)
-    # max_val = np.max(labels_train, axis=0)
-    # labels_train = (labels_train - min_val) / (max_val - min_val)
-    # labels_test = (labels_test - min_val) / (max_val - min_val)
-    # 单位化
-    # label_train = label_train / np.linalg.norm(label_train, axis=1, keepdims=True)
-    # label_test = label_test / np.linalg.norm(label_test, axis=1, keepdims=True)
-
-    #单位化（正确）
-    # 计算每个向量的模长
+    #Normalization
     vector_norms = np.sqrt(np.sum(labels_train**2, axis=1))
-    # 找到最大模长
     max_norm = np.max(vector_norms)
-    # 以最大模长为参考进行标准化
     labels_train = labels_train / max_norm
     labels_test = labels_test / max_norm
 
@@ -240,77 +221,6 @@ def draw_error_distribution(true_vals, pred_vals):
     plt.yticks(fontsize=16)
     plt.savefig(os.path.join(args.log_dir, 'error_distribution.png') if args.log_dir else 'error_distribution.png', dpi=300)
     plt.close()
-
-# def draw_angel_distribution(true_vals, pred_vals):
-#     plt.figure(figsize=(12, 8))
-    
-#     # 计算夹角并添加安全措施
-#     true_norms = np.sqrt(np.sum(true_vals**2, axis=1, keepdims=True))
-#     pred_norms = np.sqrt(np.sum(pred_vals**2, axis=1, keepdims=True))
-
-#     # 避免除以零
-#     valid_indices = (true_norms > 1e-8).squeeze() & (pred_norms > 1e-8).squeeze()
-#     true_normalized = np.zeros_like(true_vals)
-#     pred_normalized = np.zeros_like(pred_vals)
-
-#     true_normalized[valid_indices] = true_vals[valid_indices] / true_norms[valid_indices]
-#     pred_normalized[valid_indices] = pred_vals[valid_indices] / pred_norms[valid_indices]
-
-#     dot_products = np.sum(true_normalized * pred_normalized, axis=1)
-
-#     # 确保点积在有效范围内
-#     dot_products = np.clip(dot_products, -1.0, 1.0)
-
-#     # 计算角度
-#     angles_rad = np.arccos(dot_products)
-#     angles_deg = angles_rad * 180.0 / np.pi
-    
-#     # 先计算统计量，确保无论走哪个分支都有值
-#     mean_diff = np.mean(angles_deg)
-#     std_diff = np.std(angles_deg)
-
-#     # 过滤掉任何NaN值然后计算分位数
-#     angles_deg_clean = angles_deg[~np.isnan(angles_deg)]
-#     if len(angles_deg_clean) > 0:
-#         percentile_68 = np.percentile(angles_deg_clean, 68)
-#         plt.axvline(x=percentile_68, color='orange', linestyle='--', 
-#                     label=f'68th Percentile: {percentile_68:.3f}°')
-#     else:
-#         print("Warning: No valid angles to calculate percentile")
-#         # 没有有效角度时，使用默认值或其他处理方式
-#         percentile_68 = float('nan')
-
-#     # 绘制直方图
-#     plt.hist(angles_deg, bins=50, alpha=0.7, density=True,
-#             label='Angular Differences', color='blue')
-    
-#     # 添加零误差线和平均误差线
-#     plt.axvline(x=0, color='r', linestyle='--', label='Zero Error')
-#     plt.axvline(x=mean_diff, color='g', linestyle='--', label=f'Mean Error')
-    
-#     # 如果之前未定义percentile_68，则重新计算
-#     if 'percentile_68' not in locals():
-#         percentile_68 = np.percentile(angles_deg, 68)
-#     plt.axvline(x=percentile_68, color='orange', linestyle='--', 
-#                 label=f'68th Percentile: {percentile_68:.3f}°')
-    
-#     info_text = f'Mean Error: {mean_diff:.3f}°\nStd Dev: {std_diff:.3f}°\n68th Percentile: {percentile_68:.3f}°'
-#     plt.text(0.05, 0.95, info_text,
-#              transform=plt.gca().transAxes,
-#              fontsize=12,
-#              bbox=dict(facecolor='white', alpha=0.8),
-#              verticalalignment='top')
-    
-#     plt.xlabel('Angular Difference Between Predicted and True Vectors [degrees]', fontsize=20)
-#     plt.ylabel('Density', fontsize=20)
-#     plt.title('Distribution of Angular Errors', fontsize=22)
-#     plt.legend(fontsize=16, loc='upper right')
-#     plt.grid(True, alpha=0.3)
-#     plt.xticks(fontsize=16)
-#     plt.yticks(fontsize=16)
-#     plt.savefig(os.path.join(args.log_dir, 'angel_distribution.png') if args.log_dir else 'angel_distribution.png', dpi=300)
-#     plt.close()
-
 def draw_angel_distribution(true_vals, pred_vals):
     # 计算夹角
     cos_angles = np.sum(true_vals * pred_vals, axis=1) / (
@@ -339,57 +249,6 @@ def draw_angel_distribution(true_vals, pred_vals):
     plt.savefig(os.path.join(args.log_dir, 'angel_distribution.png') if args.log_dir else 'angel_distribution.png', dpi=500)
     plt.close()
 
-# def draw_angel_distribution(true_vals, pred_vals):
-#     plt.figure(figsize=(12, 8))
-    
-#     # Calculate the angular difference between predicted and true direction vectors
-#     # true_vals and pred_vals are 3D direction vectors (x, y, z)
-#     true_norms = np.sqrt(np.sum(true_vals**2, axis=1, keepdims=True))
-#     pred_norms = np.sqrt(np.sum(pred_vals**2, axis=1, keepdims=True))
-#     dot_products = np.sum((true_vals/true_norms) * (pred_vals/pred_norms), axis=1)
-    
-#     # Ensure dot products are within valid range for arccos [-1, 1]
-#     # dot_products = np.clip(dot_products, -1.0, 1.0)
-    
-#     # Calculate angles in radians and convert to degrees
-#     angles_rad = np.arccos(dot_products)
-#     angles_deg = angles_rad * 180.0 / np.pi
-    
-#     # Plot histogram of angular differences
-#     plt.hist(angles_deg, bins=50, alpha=0.7, density=True,
-#              label='Angular Differences', color='blue')
-    
-#     # Add zero error line
-#     plt.axvline(x=0, color='r', linestyle='--', label='Zero Error')
-    
-#     # Add statistical information
-#     mean_diff = np.mean(angles_deg)
-#     std_diff = np.std(angles_deg)
-#     plt.axvline(x=mean_diff, color='g', linestyle='--',
-#                 label=f'Mean Error')
-
-#     # Calculate and add 68th percentile line
-#     percentile_68 = np.percentile(angles_deg, 68)
-#     plt.axvline(x=percentile_68, color='orange', linestyle='--', label=f'68th Percentile: {percentile_68:.3f}°')
-    
-    
-#     info_text = f'Mean Error: {mean_diff:.3f}°\nStd Dev: {std_diff:.3f}°\n68th Percentile: {percentile_68:.3f}°'
-#     plt.text(0.05, 0.95, info_text,
-#              transform=plt.gca().transAxes,
-#              fontsize=12,
-#              bbox=dict(facecolor='white', alpha=0.8),
-#              verticalalignment='top')
-    
-#     plt.xlabel('Angular Difference Between Predicted and True Vectors [degrees]', fontsize=20)
-#     plt.ylabel('Density', fontsize=20)
-#     plt.title('Distribution of Angular Errors', fontsize=22)
-#     plt.legend(fontsize=16, loc='upper right')
-#     plt.grid(True, alpha=0.3)
-#     plt.xticks(fontsize=16)
-#     plt.yticks(fontsize=16)
-#     plt.savefig(os.path.join(args.log_dir, 'angel_distribution.png') if args.log_dir else 'angel_distribution.png', dpi=300)
-#     plt.close()
-
 
 def calculate_loss_distribution(pred_vals, true_vals):
     # Calculate the loss using the same method as in get_loss
@@ -397,7 +256,6 @@ def calculate_loss_distribution(pred_vals, true_vals):
                         (true_vals[:, 1] - pred_vals[:, 1])**2 + 
                         (true_vals[:, 2] - pred_vals[:, 2])**2)
     return losses.cpu().numpy()
-
 def draw_loss_distribution(pred_vals, true_vals):
     losses = calculate_loss_distribution(pred_vals, true_vals)
     
@@ -437,7 +295,7 @@ def train(model, criterion, optimizer, train_loader, device):
         points = points.float().to(device)
         target = target.float().to(device)
 
-        # 应用数据增强
+        # data augmentation
         #points = augment_point_cloud(points, jitter=True, dropout=True)
 
         optimizer.zero_grad()
@@ -446,7 +304,7 @@ def train(model, criterion, optimizer, train_loader, device):
         loss = criterion(pred, target)
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  # 添加梯度裁剪
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)  
         optimizer.step()
 
         total_loss += loss.item()
@@ -462,14 +320,13 @@ def evaluate(model, criterion, test_loader, device):
         for points, target in tqdm(test_loader, desc='Testing'):
             points = points.to(device)
             target = target.to(device)
-            # 应用数据增强
+            # data augmentation
             #points = augment_point_cloud(points, jitter=True, dropout=True)
 
             pred, _ = model(points)
             loss = criterion(pred, target)
             total_loss += loss.item()
-            
-            # Store predictions and targets
+
             all_preds.append(pred.cpu().numpy())
             all_targets.append(target.cpu().numpy())
     
@@ -484,20 +341,18 @@ def main(args):
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     device = torch.device("cuda" if torch.cuda.is_available() and not args.use_cpu else "cpu")
 
-    # 加载数据并划分训练集和测试集
+    # Load data
     points_train, points_test, labels_train, labels_test = load_data()
 
     # Modified model initialization
     model = get_model(3, normal_channel=True)
-    model = model.to(device)  # Move model to device first
-    model = model.float()     # Then convert to float
+    model = model.to(device)  
+    model = model.float()     
 
-    # 打印模型信息
     logger.info("Model Architecture:")
-    # logger.info(model)
     logger.info(f'Total parameters: {sum(p.numel() for p in model.parameters()):,}')
 
-    torch.cuda.empty_cache()  # Clear GPU memory cache
+    torch.cuda.empty_cache() 
     
     criterion = get_loss().to(device)
     optimizer = optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
@@ -510,18 +365,18 @@ def main(args):
         min_lr=1e-6
     )
     # Replace the existing scheduler with this one
+
     # scheduler = optim.lr_scheduler.ExponentialLR(
     #     optimizer,
     #     gamma=0.95,  # This is equivalent to multiplying by 0.98 each epoch
     # )
+
     # scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epoch, eta_min=1e-6)
 
     train_dataset = CustomDataset(points_train, labels_train)
-    #train_dataset = PMTDataLoader(points_train, labels_train, args)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
 
     test_dataset = CustomDataset(points_test, labels_test)
-    #test_dataset = PMTDataLoader(points_test, labels_test, args)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     train_losses = []
@@ -536,12 +391,11 @@ def main(args):
         train_loss = train(model, criterion, optimizer, train_loader, device)
         test_loss, current_preds, current_targets = evaluate(model, criterion, test_loader, device)
         
-        scheduler.step(test_loss) # 根据test_loss调整学习率
+        scheduler.step(test_loss)
         
         train_losses.append(train_loss)
         test_losses.append(test_loss)
         
-        # 保存最佳模型
         if test_loss < best_test_loss:
             best_test_loss = test_loss
             best_model_state = model.state_dict().copy()
@@ -550,30 +404,23 @@ def main(args):
             
         logger.info(f'Epoch [{epoch+1}/{args.epoch}], Train Loss: {train_loss:.4f}, Test Loss: {test_loss:.4f}')
 
-    # 保存最佳模型
     if args.log_dir is not None:
         os.makedirs(args.log_dir, exist_ok=True)
         torch.save(best_model_state, os.path.join(args.log_dir, 'best_pointnet_regression_model.pth'))
-
-    # 绘制学习曲线
     draw_learning_curve(train_losses, test_losses)
 
-    # 使用最佳模型的预测结果绘制性能图
+    # draw performance and distribution plots
     theta_predict_test = np.arctan(np.sqrt(np.power(best_preds[:,0], 2) + np.power(best_preds[:,1], 2))/best_preds[:,2])
     theta_true_test = np.arctan(np.sqrt(np.power(best_targets[:,0], 2) + np.power(best_targets[:,1], 2))/best_targets[:,2])
     theta_predict_test[theta_predict_test<0] = theta_predict_test[theta_predict_test<0] + np.pi
     theta_true_test[theta_true_test<0] = theta_true_test[theta_true_test<0] + np.pi
     
-    # 绘制性能散点图
     draw_performance(theta_true_test, theta_predict_test)
     
-    # 绘制分布图
     draw_error_distribution(theta_true_test, theta_predict_test)
 
-    # 绘制分布图
     draw_angel_distribution(best_targets, best_preds)
     
-    # 绘制损失分布图
     #draw_loss_distribution(torch.tensor(best_preds), torch.tensor(best_targets))
 
 if __name__ == '__main__':

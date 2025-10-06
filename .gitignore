@@ -1,0 +1,11 @@
+__pycache__/
+data_utils/__pycache__/
+models/__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+
+*.log
+*.out
+nohup.out

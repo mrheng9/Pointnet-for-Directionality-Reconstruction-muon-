@@ -48,7 +48,6 @@ class PMTDataLoader(Dataset):
         if not self.use_normals and point_set.shape[1] > 3:
             point_set = point_set[:, 0:3]
         
-        # 转换为PyTorch张量
         point_set = torch.from_numpy(point_set.astype(np.float32))
         label = torch.from_numpy(np.array(label).astype(np.float32))
         
